@@ -1,730 +1,896 @@
 <!DOCTYPE html>
- <html lang="en">
- <head>
-   <meta charset="UTF-8" />
-   <!-- Responsive meta tag -->
-   <meta name="viewport" content="width=device-width, initial-scale=1" />
-   <title>Karaoke Visualizer - Customizable, Dripping Effects</title>
-   <style>
-     /* Global Styles with Courier New and 3D Perspective */
-     body {
-       margin: 0;
-       padding: 0;
-       background-color: #000;
-       color: #fff;
-       font-family: "Courier New", Courier, monospace;
-       overflow: hidden;
-       position: relative;
-       perspective: 800px;
-     }
-     /* Signature in Top Left */
-     #signature {
-       position: fixed;
-       top: 10px;
-       left: 10px;
-       font-weight: bold;
-       z-index: 1000;
-       font-size: 18px;
-     }
-     /* Notification Message */
-     #notification {
-       position: fixed;
-       top: 10px;
-       left: 50%;
-       transform: translateX(-50%);
-       background: rgba(50,50,50,0.8);
-       padding: 10px 20px;
-       border-radius: 10px;
-       display: none;
-       z-index: 1000;
-       font-size: 16px;
-     }
-     /* Full-screen Canvas for Animations */
-     #fireworks-canvas {
-       position: fixed;
-       top: 0;
-       left: 0;
-       width: 100%;
-       height: 100%;
-       z-index: -1;
-       pointer-events: none;
-       background: transparent;
-     }
-     /* Controls Container – fixed at bottom center */
-     .controls {
-       position: fixed;
-       bottom: 10px;
-       left: 50%;
-       transform: translateX(-50%);
-       display: flex;
-       flex-direction: column;
-       align-items: center;
-       gap: 10px;
-       z-index: 1;
-       width: 90%;
-       max-width: 400px;
-     }
-     /* Customizer sub-container */
-     #customizer {
-       display: flex;
-       align-items: center;
-       gap: 10px;
-     }
-     #customizer button, #customizer select {
-       border: none;
-       background: linear-gradient(45deg, #222, #444);
-       color: #fff;
-       padding: 8px 12px;
-       font-size: 16px;
-       border-radius: 20px;
-       cursor: pointer;
-       box-shadow: none;
-     }
-     /* Song Controls (select, play, speed, font size) */
-     .controls select, .controls button {
-       width: 100%;
-       background: linear-gradient(45deg, #222, #444);
-       border: none;
-       color: #fff;
-       padding: 12px;
-       font-size: 16px;
-       border-radius: 20px;
-       cursor: pointer;
-       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-       transition: transform 0.2s;
-     }
-     .controls select:hover, .controls button:hover { transform: scale(1.05); }
-     .controls select:focus, .controls button:focus { outline: none; border-color: #fff; }
-     #speed-display { font-size: 18px; margin-top: 5px; }
-     /* Font size controls */
-     #font-controls {
-       display: flex;
-       gap: 10px;
-     }
-     /* Container for Visualizers (Radial Layout) */
-     #visualizer-container {
-       position: relative;
-       width: 100%;
-       height: 80vh;
-       margin-bottom: 20px;
-     }
-     /* Visualizer Containers (Draggable) */
-     .visualizer {
-       position: absolute;
-       border: 3px solid #fff;
-       border-radius: 50%;
-       overflow: hidden;
-       transform-style: preserve-3d;
-       background: rgba(0,0,0,0.2);
-       cursor: move;
-     }
-     .visualizer.large { width: 500px; height: 500px; }
-     .visualizer.small { width: 150px; height: 150px; }
-     /* Blob in Each Visualizer: Fixed Size & Centered */
-     .blob {
-       position: absolute;
-       top: 50%;
-       left: 50%;
-       transform: translate(-50%, -50%);
-       border-radius: 50%;
-       background-color: #fff;
-       box-shadow: 0 0 20px 10px rgba(255,255,255,0.6);
-       transition: box-shadow 0.2s;
-     }
-     .visualizer.large .blob { width: 250px; height: 250px; }
-     .visualizer.small .blob { width: 100px; height: 100px; }
-     /* Blob shape classes using clip-path */
-     .blob.circle { clip-path: circle(50% at 50% 50%); }
-     .blob.star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
-     /* Centered Lyrics Display */
-     #lyrics-container {
-       position: absolute;
-       top: 50%;
-       left: 50%;
-       transform: translate(-50%, -50%);
-       text-align: center;
-       line-height: 1.5;
-       z-index: 100;
-       color: #fff;
-       max-width: 90%;
-     }
-   </style>
- </head>
- <body>
-   <!-- Signature -->
-   <div id="signature">App made by Jada Naomi</div>
-   <!-- Notification Message -->
-   <div id="notification"></div>
-   
-   <!-- Full-screen Canvas for Animations -->
-   <canvas id="fireworks-canvas"></canvas>
-   
-   <!-- Hidden Audio Element -->
-   <audio id="karaoke-audio"></audio>
-   
-   <!-- Container for Visualizers -->
-   <div id="visualizer-container">
-     <!-- Initial Visualizers -->
-     <div class="visualizer large" id="visualizer-center">
-       <div class="blob circle" data-scale="1"></div>
-     </div>
-     <div class="visualizer small" id="visualizer-left">
-       <div class="blob circle" data-scale="0.6"></div>
-     </div>
-     <div class="visualizer small" id="visualizer-right">
-       <div class="blob circle" data-scale="0.6"></div>
-     </div>
-   </div>
-   
-   <!-- Controls Container -->
-   <div class="controls">
-     <div id="customizer">
-       <button id="add-visualizer">+</button>
-       <button id="remove-visualizer">–</button>
-       <select id="shape-selector">
-         <option value="circle">Circle</option>
-         <option value="star">Star</option>
-       </select>
-     </div>
-     <select id="song-selector">
-       <!-- Ensure your LRC files are located in a folder named "lyrics" -->
-       <option value="song1">Thinking Bout You (Frank Ocean)</option>
-       <option value="song2">Grey October (Boldy James & The Alchemist)</option>
-       <option value="song3">Carruth (Boldy James & The Alchemist)</option>
-       <option value="song4">Deserve (Smino)</option>
-       <option value="song5">Whim Whammie (Pluto & Ykniece)</option>
-       <option value="song6">Murder She Wrote (Tay K)</option>
-     </select>
-     <button id="play-button">Play & Pause </button>
-     <button id="slow-down-button">Slow Down</button>
-     <button id="speed-up-button">Speed Up</button>
-     <div id="speed-display">Speed: 1.0x</div>
-     <div id="font-controls">
-       <button id="font-increase">A+</button>
-       <button id="font-decrease">A–</button>
-     </div>
-   </div>
-   
-   <!-- Centered Lyrics Display -->
-   <div id="lyrics-container">
-     <!-- Lyrics will be dynamically inserted here -->
-   </div>
-   
-   <script>
-     /***********************
-      * Global Elements and Variables
-      ***********************/
-     const audio = document.getElementById("karaoke-audio");
-     const songSelector = document.getElementById("song-selector");
-     const playButton = document.getElementById("play-button");
-     const slowDownButton = document.getElementById("slow-down-button");
-     const speedUpButton = document.getElementById("speed-up-button");
-     const speedDisplay = document.getElementById("speed-display");
-     const currentLyric = document.getElementById("current-lyric");
-     const prevLyric = document.getElementById("prev-lyric");
-     const nextLyric = document.getElementById("next-lyric");
-     const visualizerContainer = document.getElementById("visualizer-container");
-     const fireworksCanvas = document.getElementById("fireworks-canvas");
-     const fwCtx = fireworksCanvas.getContext("2d");
-     const addButton = document.getElementById("add-visualizer");
-     const removeButton = document.getElementById("remove-visualizer");
-     const shapeSelector = document.getElementById("shape-selector");
-     const notification = document.getElementById("notification");
-     const fontIncrease = document.getElementById("font-increase");
-     const fontDecrease = document.getElementById("font-decrease");
-     
-     let lyrics = [];
-     let currentIndex = 0;
-     let audioCtx, analyser, source, dataArray, bufferLength;
-     
-     // Smoothing variables for visualizer animation
-     let smoothedHue = 0;
-     let smoothedOffsetX = 0;
-     let smoothedOffsetY = 0;
-     const smoothingFactor = 0.05;
-     let lastAvg = 0;
-     
-     /***********************
-      * Audio and Lyrics Setup
-      ***********************/
-     function loadSong(songName) {
-       audio.src = `songs/${songName}.mp3`;
-       fetch(`lyrics/${songName}.lrc`)
-         .then(res => res.text())
-         .then(parseLRC)
-         .catch(() => {
-           document.getElementById("lyrics-container").innerHTML = "Lyrics not found, sorry deary.";
-         });
-     }
-     
-     function parseLRC(data) {
-       const lines = data.split("\n");
-       lyrics = lines.map(line => {
-         const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
-         if (!match) return null;
-         const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
-         return { time, text: match[3].trim() };
-       }).filter(Boolean);
-       console.log("Parsed lyrics:", lyrics);
-       currentIndex = 0;
-     }
-     
-     audio.addEventListener("play", () => {
-       if (!audioCtx) {
-         setupAudioAnalyzer();
-         animateVisualizer();
-       }
-       requestAnimationFrame(updateLyrics);
-       startRandomAnimations();
-     });
-     
-     function setupAudioAnalyzer() {
-       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-       analyser = audioCtx.createAnalyser();
-       source = audioCtx.createMediaElementSource(audio);
-       source.connect(analyser);
-       analyser.connect(audioCtx.destination);
-       analyser.fftSize = 64;
-       bufferLength = analyser.frequencyBinCount;
-       dataArray = new Uint8Array(bufferLength);
-     }
-     
-     /***********************
-      * Speed Controls and Notification
-      ***********************/
-     function showNotification(msg) {
-       notification.innerText = msg;
-       notification.style.display = "block";
-       setTimeout(() => { notification.style.display = "none"; }, 2000);
-     }
-     
-     slowDownButton.addEventListener("click", () => {
-       audio.playbackRate = Math.max(0.5, audio.playbackRate - 0.1);
-       updateSpeedDisplay();
-       showNotification("It will take a second to pitch correctly");
-     });
-     
-     speedUpButton.addEventListener("click", () => {
-       audio.playbackRate = Math.min(2.0, audio.playbackRate + 0.1);
-       updateSpeedDisplay();
-       showNotification("It will take a second to pitch correctly");
-     });
-     
-     function updateSpeedDisplay() {
-       speedDisplay.textContent = `Speed: ${audio.playbackRate.toFixed(1)}x`;
-     }
-     
-     /***********************
-      * Font Size Controls for Lyrics
-      ***********************/
-     fontIncrease.addEventListener("click", () => {
-       let container = document.getElementById("lyrics-container");
-       let currentSize = parseInt(window.getComputedStyle(container).fontSize);
-       if (currentSize < 60) {
-         container.style.fontSize = (currentSize + 2) + "px";
-       }
-     });
-     
-     fontDecrease.addEventListener("click", () => {
-       let container = document.getElementById("lyrics-container");
-       let currentSize = parseInt(window.getComputedStyle(container).fontSize);
-       if (currentSize > 12) {
-         container.style.fontSize = (currentSize - 2) + "px";
-       }
-     });
-     
-     /***********************
-      * Draggable Visualizers
-      ***********************/
-     function makeDraggable(el) {
-       el.style.position = "absolute";
-       el.style.left = el.offsetLeft + "px";
-       el.style.top = el.offsetTop + "px";
-       el.addEventListener("mousedown", function(e) {
-         e.preventDefault();
-         let startX = e.clientX;
-         let startY = e.clientY;
-         let origX = parseFloat(el.style.left);
-         let origY = parseFloat(el.style.top);
-         function mouseMoveHandler(e) {
-           let deltaX = e.clientX - startX;
-           let deltaY = e.clientY - startY;
-           el.style.left = origX + deltaX + "px";
-           el.style.top = origY + deltaY + "px";
-         }
-         function mouseUpHandler() {
-           document.removeEventListener("mousemove", mouseMoveHandler);
-           document.removeEventListener("mouseup", mouseUpHandler);
-         }
-         document.addEventListener("mousemove", mouseMoveHandler);
-         document.addEventListener("mouseup", mouseUpHandler);
-       });
-     }
-     
-     document.querySelectorAll(".visualizer").forEach(makeDraggable);
-     
-     /***********************
-      * Arrange Visualizers Radially
-      ***********************/
-     function arrangeVisualizersRadial() {
-       const visualizers = Array.from(document.querySelectorAll(".visualizer"));
-       const count = visualizers.length;
-       const centerX = visualizerContainer.clientWidth / 2;
-       const centerY = visualizerContainer.clientHeight / 2;
-       const radius = Math.min(centerX, centerY) - 150;
-       visualizers.forEach((vis, i) => {
-         const angle = (2 * Math.PI / count) * i;
-         const x = centerX + radius * Math.cos(angle) - vis.clientWidth / 2;
-         const y = centerY + radius * Math.sin(angle) - vis.clientHeight / 2;
-         vis.style.left = x + "px";
-         vis.style.top = y + "px";
-       });
-     }
-     
-     arrangeVisualizersRadial();
-     
-     /***********************
-      * Customizer Controls: Add/Remove Visualizers and Shape Selector
-      ***********************/
-     addButton.addEventListener("click", () => {
-       const visualizers = document.querySelectorAll(".visualizer");
-       if (visualizers.length >= 20) return;
-       const newVis = document.createElement("div");
-       newVis.classList.add("visualizer", "small");
-       const newBlob = document.createElement("div");
-       newBlob.classList.add("blob", shapeSelector.value);
-       newBlob.setAttribute("data-scale", "0.6");
-       newVis.appendChild(newBlob);
-       visualizerContainer.appendChild(newVis);
-       makeDraggable(newVis);
-       arrangeVisualizersRadial();
-     });
-     
-     removeButton.addEventListener("click", () => {
-       const visualizers = document.querySelectorAll(".visualizer");
-       if (visualizers.length <= 1) return;
-       visualizerContainer.removeChild(visualizers[visualizers.length - 1]);
-       arrangeVisualizersRadial();
-     });
-     
-     shapeSelector.addEventListener("change", () => {
-       document.querySelectorAll(".blob").forEach(blob => {
-         blob.classList.remove("circle", "star");
-         blob.classList.add(shapeSelector.value);
-       });
-     });
-     
-     /***********************
-      * Visualizer Animation (Smooth, Fluid, Psychedelic Neon Glow)
-      ***********************/
-     function animateVisualizer() {
-       analyser.getByteFrequencyData(dataArray);
-       let sum = 0;
-       for (let i = 0; i < dataArray.length; i++) {
-         sum += dataArray[i];
-       }
-       const avg = sum / dataArray.length;
-       
-       const targetHue = (avg * 360 / 256) % 360;
-       const oscillationFrequency = 2;
-       const targetOffsetX = Math.sin(audio.currentTime * oscillationFrequency) * (avg / 80);
-       const targetOffsetY = Math.cos(audio.currentTime * oscillationFrequency) * (avg / 80);
-       
-       smoothedHue += (targetHue - smoothedHue) * smoothingFactor;
-       smoothedOffsetX += (targetOffsetX - smoothedOffsetX) * smoothingFactor;
-       smoothedOffsetY += (targetOffsetY - smoothedOffsetY) * smoothingFactor;
-       
-       const rotateY = audio.currentTime * 5;
-       const glowIntensity = avg / 80;
-       const shadowBlur = 20 + glowIntensity * 40;
-       const shadowSpread = 10 + glowIntensity * 20;
-       const dynamicBoxShadow = `0 0 ${shadowBlur}px ${shadowSpread}px rgba(0,255,255,0.9)`;
-       
-       const currentBlobs = document.querySelectorAll(".blob");
-       currentBlobs.forEach(blob => {
-         const scaleFactor = parseFloat(blob.getAttribute("data-scale"));
-         blob.style.transform = `translate(-50%, -50%) rotateY(${rotateY}deg) scale(${scaleFactor})`;
-         blob.style.backgroundColor = `hsl(${smoothedHue}, 100%, 50%)`;
-         blob.style.boxShadow = dynamicBoxShadow;
-       });
-       
-       // Spawn a strata effect (small multi-colored particles) if amplitude change is sharp.
-       if (Math.abs(avg - lastAvg) > 10) {
-         document.querySelectorAll(".visualizer").forEach(vis => {
-           const rect = vis.getBoundingClientRect();
-           const cx = rect.left + rect.width / 2;
-           const cy = rect.top + rect.height / 2;
-           // Spawn strata particles with a fraction of the visualizer's width.
-           spawnStrata(cx, cy, vis.clientWidth * 0.1, `hsl(${smoothedHue}, 100%, 50%)`);
-         });
-       }
-       lastAvg = avg;
-       
-       requestAnimationFrame(animateVisualizer);
-     }
-     
-     function spawnStrata(x, y, size, color) {
-       // Spawn multiple small strata particles in random directions.
-       for (let i = 0; i < 10; i++) {
-         particles.push(new Particle(x, y, "strata", size, color));
-       }
-     }
-     
-     /***********************
-      * Lyrics Synchronization
-      ***********************/
-     function updateLyrics() {
-       const holdTime = 2; // Hold each lyric for 2 seconds
-       const time = audio.currentTime;
-       let newIndex = lyrics.findIndex((line, i) => {
-         const next = lyrics[i + 1];
-         return time >= line.time && (!next || time < next.time + holdTime);
-       });
-       if (newIndex !== -1) {
-         currentIndex = newIndex;
-       }
-       // Display previous 5 lines, current line, and next 5 lines
-       let start = Math.max(0, currentIndex - 5);
-       let end = Math.min(lyrics.length, currentIndex + 6);
-       let displayText = "";
-       for (let i = start; i < end; i++) {
-         if (i === currentIndex) {
-           displayText += "<div style='font-weight:bold; color:yellow;'>" + lyrics[i].text + "</div>";
-         } else {
-           displayText += "<div>" + lyrics[i].text + "</div>";
-         }
-       }
-       document.getElementById("lyrics-container").innerHTML = displayText;
-       requestAnimationFrame(updateLyrics);
-     }
-     
-     songSelector.addEventListener("change", (e) => {
-       loadSong(e.target.value);
-       audio.playbackRate = 1.0;
-       updateSpeedDisplay();
-       startRandomAnimations();
-     });
-     
-     playButton.addEventListener("click", () => {
-       if (audio.paused) {
-         audio.play();
-         playButton.textContent = "Pause";
-       } else {
-         audio.pause();
-         playButton.textContent = "Play";
-       }
-     });
-     
-     loadSong("song1");
-     
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Responsive meta tag -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Karaoke Visualizer - High Functioning Karaoke App</title>
+  <style>
+    /* Global reset and base styling */
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: "Courier New", Courier, monospace;
+      overflow: hidden;
+      position: relative;
+      perspective: 800px;
+      font-size: 18px;
+    }
+    /* Signature */
+    #signature {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-weight: bold;
+      z-index: 1100;
+      font-size: 18px;
+    }
+    /* Notification Message */
+    #notification {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(50,50,50,0.8);
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: none;
+      z-index: 1100;
+      font-size: 16px;
+    }
+    /* Full-screen Canvas for Animations */
+    #fireworks-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+      background: transparent;
+    }
+    /* Visualizer Container */
+    #visualizer-container {
+      position: relative;
+      width: 100%;
+      height: 80vh;
+      margin-bottom: 20px;
+    }
+    /* Visualizer Elements */
+    .visualizer {
+      position: absolute;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      background: rgba(0,0,0,0.2);
+      cursor: move;
+      z-index: 10;
+    }
+    .visualizer.large { width: 500px; height: 500px; }
+    .visualizer.small { width: 150px; height: 150px; }
+    /* Blob inside visualizers */
+    .blob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background-color: #fff;
+      box-shadow: 0 0 20px 10px rgba(255,255,255,0.6);
+      transition: box-shadow 0.2s;
+    }
+    .visualizer.large .blob { width: 250px; height: 250px; }
+    .visualizer.small .blob { width: 100px; height: 100px; }
+    /* Blob shape classes */
+    .blob.circle { clip-path: circle(50% at 50% 50%); }
+    .blob.star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+    .blob.custom { /* Its clip-path is defined by custom handles */ }
+    /* Handle styling for custom blob editing */
+    .handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 2px solid #000;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 100;
+    }
+    /* Centered Lyrics Display */
+    #lyrics-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      line-height: 1.5;
+      z-index: 100;
+      color: #fff;
+      max-width: 90%;
+    }
+    /* Minimal Controls Panel positioned at Bottom Right */
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1100;
+      max-width: 300px;
+    }
+    /* New Controls: Lyrics Opacity & Size */
+    .controls label, .controls input[type="range"] {
+      width: 100%;
+    }
+    /* Trash Can positioned at Bottom Left */
+    #trash-can {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      width: 100px;
+      height: 100px;
+      border: 2px dashed rgba(255,255,255,0.5);
+      border-radius: 10px;
+      opacity: 0.5;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    #trash-can:hover {
+      opacity: 0.8;
+    }
+    /* Uniform Button Styling */
+    .controls button {
+      background: linear-gradient(45deg, #222, #444);
+      color: #fff;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      width: 100%;
+      transition: transform 0.2s;
+    }
+    .controls button:hover {
+      transform: scale(1.05);
+    }
+    .controls button:focus {
+      outline: none;
+    }
+    /* Uniform Select Styling */
+    .controls select {
+      background: linear-gradient(45deg, #222, #444);
+      color: #fff;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 20px;
+      width: 100%;
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+    .controls select:focus {
+      outline: none;
+    }
+    /* Uniform Slider Styling with Gradient */
+    .controls input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #ff0000, #00ff00, #0000ff);
+      outline: none;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+    .controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+    .controls input[type="range"]:hover {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Signature and Notification -->
+  <div id="signature">App made by Jada Naomi</div>
+  <div id="notification"></div>
+  
+  <!-- Full-screen Canvas for Animations -->
+  <canvas id="fireworks-canvas"></canvas>
+  
+  <!-- Hidden Audio Element -->
+  <audio id="karaoke-audio"></audio>
+  
+  <!-- Visualizer Container -->
+  <div id="visualizer-container">
+    <!-- Initial Visualizers -->
+    <div class="visualizer large" id="visualizer-center">
+      <div class="blob circle" data-scale="1"></div>
+    </div>
+    <div class="visualizer small" id="visualizer-left">
+      <div class="blob circle" data-scale="0.6"></div>
+    </div>
+    <div class="visualizer small" id="visualizer-right">
+      <div class="blob circle" data-scale="0.6"></div>
+    </div>
+  </div>
+  
+  <!-- Controls Panel (Bottom Right) -->
+  <div class="controls">
+    <!-- Song Selection and Playback Controls -->
+    <select id="song-selector">
+      <option value="song1">Thinking Bout You (Frank Ocean)</option>
+      <option value="song2">Grey October (Boldy James & The Alchemist)</option>
+      <option value="song3">Carruth (Boldy James & The Alchemist)</option>
+      <option value="song4">Deserve (Smino)</option>
+      <option value="song5">Whim Whammie (Pluto & Ykniece)</option>
+      <option value="song6">Murder She Wrote (Tay K)</option>
+    </select>
+    <button id="play-button">Play & Pause</button>
+    <!-- Mic and Audio Effects Controls -->
+    <button id="mic-toggle-button">Mic</button>
+    <label for="mic-volume">Mic Volume:</label>
+    <input type="range" id="mic-volume" min="0" max="2" step="0.01" value="1">
+    <label for="bass-slider">Bass Control:</label>
+    <input type="range" id="bass-slider" min="-30" max="30" step="1" value="0">
+    <label for="autotune-selector">Autotune:</label>
+    <select id="autotune-selector">
+      <option value="none">None</option>
+      <option value="harmonic">Harmonic</option>
+      <option value="melodic">Melodic</option>
+      <option value="deeper">Deeper</option>
+    </select>
+    <!-- Visualizer Customization -->
+    <label for="shape-selector">Visualizer Shape:</label>
+    <select id="shape-selector">
+      <option value="big-circle">Big Circle</option>
+      <option value="small-circle">Small Circle</option>
+      <option value="star">Star</option>
+      <option value="custom">Custom Blob</option>
+    </select>
+    <button id="add-visualizer">Add Visualizer</button>
+    <button id="remove-visualizer">Remove Visualizer</button>
+    <!-- New Controls for Lyrics -->
+    <label for="lyrics-opacity">Lyrics Opacity (Volume):</label>
+    <input type="range" id="lyrics-opacity" min="0" max="1" step="0.05" value="1">
+    <label for="lyrics-size">Lyrics Size:</label>
+    <input type="range" id="lyrics-size" min="12" max="40" step="1" value="18">
+  </div>
+  
+  <!-- Centered Lyrics Display -->
+  <div id="lyrics-container"></div>
+  
+  <!-- Trash Can (Bottom Left) -->
+  <div id="trash-can">
+    <span>Trash</span>
+  </div>
+  
+  <script>
+    /***********************
+     * Global Variables and Helper Functions
+     ***********************/
+    const audio = document.getElementById("karaoke-audio");
+    const songSelector = document.getElementById("song-selector");
+    const playButton = document.getElementById("play-button");
+    const micToggleButton = document.getElementById("mic-toggle-button");
+    const micVolumeSlider = document.getElementById("mic-volume");
+    const bassSlider = document.getElementById("bass-slider");
+    const autotuneSelector = document.getElementById("autotune-selector");
+    const shapeSelector = document.getElementById("shape-selector");
+    const addButton = document.getElementById("add-visualizer");
+    const removeButton = document.getElementById("remove-visualizer");
+    const notification = document.getElementById("notification");
+    const lyricsContainer = document.getElementById("lyrics-container");
+    const visualizerContainer = document.getElementById("visualizer-container");
+    const fireworksCanvas = document.getElementById("fireworks-canvas");
+    const fwCtx = fireworksCanvas.getContext("2d");
+    const trashCan = document.getElementById("trash-can");
+    const lyricsOpacitySlider = document.getElementById("lyrics-opacity");
+    const lyricsSizeSlider = document.getElementById("lyrics-size");
     
-     
-     function startRandomAnimations() {
-       if (randomAnimationInterval) clearInterval(randomAnimationInterval);
-       if (songSelector.value === "song6") {
-         randomAnimationInterval = setInterval(triggerBloodSplatter, 3000);
-       } else {
-         // Trigger two lily explosions simultaneously for extra fireworks.
-         randomAnimationInterval = setInterval(() => {
-           triggerLilyExplosion();
-           triggerLilyExplosion();
-         }, 5000);
-       }
-     }
-     
-     /***********************
-      * Particle and Drawing Functions for Canvas Effects
-      ***********************/
-     class Particle {
-       constructor(x, y, type = "lily", customSize, customColor) {
-         this.x = x;
-         this.y = y;
-         this.type = type; // "lily", "blood", or "strata"
-         if (this.type === "lily") {
-           this.radius = Math.random() * 3 + 3;
-           this.decay = Math.random() * 0.01 + 0.005;
-           this.randomColors = [
-             `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`,
-             `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`,
-             `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`
-           ];
-         } else if (this.type === "blood") {
-           this.radius = Math.random() * 5 + 5;
-           this.decay = Math.random() * 0.02 + 0.005;
-         } else if (this.type === "strata") {
-           // Strata particles: small bursts with random directions and glowing multi-colors.
-           this.radius = customSize || (Math.random() * 1 + 1);
-           this.decay = Math.random() * 0.007 + 0.002;
-           // Random velocities for burst effect.
-           this.velocityX = Math.random() * 4 - 2;
-           this.velocityY = Math.random() * 4 - 2;
-           this.customColor = customColor;
-         }
-         if (this.type !== "strata") {
-           const angle = Math.random() * 2 * Math.PI;
-           const speed = Math.random() * 5 + 3;
-           this.velocityX = Math.cos(angle) * speed;
-           this.velocityY = Math.sin(angle) * speed;
-         }
-         this.alpha = 1;
-       }
-       update() {
-         this.x += this.velocityX;
-         this.y += this.velocityY;
-         this.alpha -= this.decay;
-       }
-       draw(ctx) {
-         ctx.save();
-         ctx.globalAlpha = this.alpha;
-         if (this.type === "lily") {
-           drawLily(ctx, this.x, this.y, this.radius * 8, this.randomColors);
-         } else if (this.type === "blood") {
-           drawBloodDrip(ctx, this.x, this.y, this.radius * 2);
-         } else if (this.type === "strata") {
-           drawStrata(ctx, this.x, this.y, this.radius * 2, this.customColor);
-         }
-         ctx.restore();
-       }
-     }
-     
-     // Detailed 3D/4D Lily Drawing (Multi-Colored, Static Gradient)
-     function drawLily(ctx, x, y, size, colors) {
-       ctx.save();
-       ctx.translate(x, y);
-       let grad = ctx.createRadialGradient(0, 0, size * 0.1, 0, 0, size);
-       grad.addColorStop(0, colors[0]);
-       grad.addColorStop(0.5, colors[1]);
-       grad.addColorStop(1, colors[2]);
-       ctx.fillStyle = grad;
-       ctx.shadowColor = "rgba(255,255,255,0.8)";
-       ctx.shadowBlur = 20;
-       for (let i = 0; i < 4; i++) {
-         ctx.rotate((Math.PI * 2) / 4);
-         ctx.beginPath();
-         ctx.moveTo(0, 0);
-         ctx.quadraticCurveTo(size * 0.3, size * 0.5, 0, size);
-         ctx.quadraticCurveTo(-size * 0.3, size * 0.5, 0, 0);
-         ctx.fill();
-       }
-       ctx.restore();
-     }
-     
-     // Realistic Blood Drip Drawing (Dripping effect like Kill Bill)
-     function drawBloodDrip(ctx, x, y, size) {
-       ctx.save();
-       ctx.translate(x, y);
-       ctx.fillStyle = "red";
-       ctx.beginPath();
-       ctx.moveTo(0, 0);
-       ctx.bezierCurveTo(-size, size * 1.2, -size * 0.5, size * 2.5, 0, size * 3);
-       ctx.bezierCurveTo(size * 0.5, size * 2.5, size, size * 1.2, 0, 0);
-       ctx.closePath();
-       ctx.fill();
-       ctx.restore();
-     }
-     
-     // Draw a strata particle (small burst) with a multi-colored glowing gradient.
-     function drawStrata(ctx, x, y, size, color) {
-       ctx.save();
-       ctx.translate(x, y);
-       // Generate a random bright gradient for extra variation.
-       const brightColors = ["#ff69b4", "#00bfff", "#ffff00", "#ff4500", "#00ff7f"];
-       const c1 = brightColors[Math.floor(Math.random() * brightColors.length)];
-       const c2 = brightColors[Math.floor(Math.random() * brightColors.length)];
-       const c3 = brightColors[Math.floor(Math.random() * brightColors.length)];
-       let grad = ctx.createRadialGradient(0, 0, size * 0.1, 0, 0, size);
-       grad.addColorStop(0, c1);
-       grad.addColorStop(0.5, c2);
-       grad.addColorStop(1, c3);
-       ctx.fillStyle = grad;
-       ctx.shadowColor = "rgba(255,255,255,0.8)";
-       ctx.shadowBlur = 10;
-       ctx.beginPath();
-       ctx.arc(0, 0, size, 0, 2 * Math.PI);
-       ctx.fill();
-       ctx.restore();
-     }
-     
-     let particles = [];
-     
-     function triggerLilyExplosion() {
-       const x = Math.random() * fireworksCanvas.width;
-       const y = Math.random() * fireworksCanvas.height * 0.5;
-       const numParticles = 40;
-       for (let i = 0; i < numParticles; i++) {
-         particles.push(new Particle(x, y, "lily"));
-       }
-     }
-     
-     function triggerBloodSplatter() {
-       const x = Math.random() * fireworksCanvas.width;
-       const y = Math.random() * fireworksCanvas.height * 0.5;
-       const numParticles = 50;
-       for (let i = 0; i < numParticles; i++) {
-         particles.push(new Particle(x, y, "blood"));
-       }
-     }
-     
-     function animateFireworks() {
-       fwCtx.fillStyle = "rgba(0, 0, 0, 0.07)";
-       fwCtx.fillRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
-       for (let i = particles.length - 1; i >= 0; i--) {
-         const p = particles[i];
-         p.update();
-         p.draw(fwCtx);
-         if (p.alpha <= 0) {
-           particles.splice(i, 1);
-         }
-       }
-       requestAnimationFrame(animateFireworks);
-     }
-     animateFireworks();
-     
-     /***********************
-      * Resize Canvas for Responsive Layout
-      ***********************/
-     function resizeCanvas() {
-       fireworksCanvas.width = window.innerWidth;
-       fireworksCanvas.height = window.innerHeight;
-     }
-     resizeCanvas();
-     window.addEventListener("resize", resizeCanvas);
-     
-     // Rearrange visualizers radially.
-     function arrangeVisualizersRadial() {
-       const visualizers = Array.from(document.querySelectorAll(".visualizer"));
-       const count = visualizers.length;
-       const centerX = visualizerContainer.clientWidth / 2;
-       const centerY = visualizerContainer.clientHeight / 2;
-       const radius = Math.min(centerX, centerY) - 150;
-       visualizers.forEach((vis, i) => {
-         const angle = (2 * Math.PI / count) * i;
-         const x = centerX + radius * Math.cos(angle) - vis.clientWidth / 2;
-         const y = centerY + radius * Math.sin(angle) - vis.clientHeight / 2;
-         vis.style.left = x + "px";
-         vis.style.top = y + "px";
-       });
-     }
-     
-     arrangeVisualizersRadial();
-     
-     /***********************
-      * Random Animations on Canvas (Psychedelic Lilies & Dripping Blood)
-      ***********************/
-     let randomAnimationInterval = null;
-     
-     function startRandomAnimations() {
-       if (randomAnimationInterval) clearInterval(randomAnimationInterval);
-       if (songSelector.value === "song6") {
-         randomAnimationInterval = setInterval(triggerBloodSplatter, 3000);
-       } else {
-         // Trigger two lily explosions simultaneously for extra fireworks.
-         randomAnimationInterval = setInterval(() => {
-           triggerLilyExplosion();
-           triggerLilyExplosion();
-         }, 5000);
-       }
-     }
-   </script>
- </body>
- </html>
+    let lyrics = [];
+    let currentIndex = 0;
+    let audioCtx, analyser, source, dataArray, bufferLength;
+    let bassFilter;
+    let micStream = null;
+    let micAnalyzer = null;
+    let micGainNode = null;
+    let micActive = false;
+    let autotuneType = "none";
+    let smoothedHue = 0, smoothedOffsetX = 0, smoothedOffsetY = 0;
+    const smoothingFactor = 0.05;
+    let lastAvg = 0;
+    let clearScreenMode = false;  // toggled by spacebar
+    
+    // Helper: showNotification
+    function showNotification(msg) {
+      notification.innerText = msg;
+      notification.style.display = "block";
+      setTimeout(() => { notification.style.display = "none"; }, 2000);
+    }
+    
+    /***********************
+     * Audio and Lyrics Setup
+     ***********************/
+    function loadSong(songName) {
+      audio.src = `songs/${songName}.mp3`;
+      fetch(`lyrics/${songName}.lrc`)
+        .then(res => res.text())
+        .then(parseLRC)
+        .catch(() => { lyricsContainer.innerHTML = "Lyrics not found, sorry deary."; });
+      if(songName === "song6"){
+        // Any song-specific tweaks for "Murder She Wrote" can be added here.
+      }
+    }
+    
+    function parseLRC(data) {
+      const lines = data.split("\n");
+      lyrics = lines.map(line => {
+        const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+        if (!match) return null;
+        const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
+        return { time, text: match[3].trim() };
+      }).filter(Boolean);
+      console.log("Parsed lyrics:", lyrics);
+      currentIndex = 0;
+    }
+    
+    audio.addEventListener("play", () => {
+      if (!audioCtx) {
+        setupAudioAnalyzer();
+        animateVisualizer();
+      }
+      requestAnimationFrame(updateLyrics);
+      startRandomAnimations();
+    });
+    
+    function setupAudioAnalyzer() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
+      
+      bassFilter = audioCtx.createBiquadFilter();
+      bassFilter.type = "lowshelf";
+      bassFilter.frequency.value = 200;
+      bassFilter.gain.value = parseFloat(bassSlider.value);
+      
+      source = audioCtx.createMediaElementSource(audio);
+      // Connect chain: source -> bassFilter -> analyser -> destination
+      source.connect(bassFilter);
+      bassFilter.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    }
+    
+    /***********************
+     * Microphone Toggle, Monitoring, and Volume Control
+     ***********************/
+    micToggleButton.addEventListener("click", toggleMic);
+    function toggleMic() {
+      if (!micActive) {
+        navigator.mediaDevices.getUserMedia({ audio: { latency: { ideal: 0.01 } } })
+          .then(stream => {
+            micStream = stream;
+            if (!audioCtx) {
+              audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            micAnalyzer = audioCtx.createAnalyser();
+            micAnalyzer.fftSize = 64;
+            bufferLength = micAnalyzer.frequencyBinCount;
+            micGainNode = audioCtx.createGain();
+            micGainNode.gain.value = parseFloat(micVolumeSlider.value);
+            const micSource = audioCtx.createMediaStreamSource(stream);
+            micSource.connect(micGainNode);
+            micGainNode.connect(micAnalyzer);
+            // Also, connect micGainNode to destination so that users hear themselves.
+            micGainNode.connect(audioCtx.destination);
+            micActive = true;
+            micToggleButton.textContent = "Mic (On)";
+            showNotification("Microphone activated");
+          })
+          .catch(err => { alert("Microphone access denied: " + err); });
+      } else {
+        if (micStream) {
+          micStream.getTracks().forEach(track => track.stop());
+          micStream = null;
+          micActive = false;
+          micToggleButton.textContent = "Mic";
+          showNotification("Microphone deactivated");
+        }
+      }
+    }
+    micVolumeSlider.addEventListener("input", () => { if(micGainNode) micGainNode.gain.value = parseFloat(micVolumeSlider.value); });
+    bassSlider.addEventListener("input", () => { if(bassFilter) bassFilter.gain.value = parseFloat(bassSlider.value); });
+    autotuneSelector.addEventListener("change", () => { autotuneType = autotuneSelector.value; applyAutotuneEffect(autotuneType); });
+    function applyAutotuneEffect(type) {
+      // Placeholder: insert your DSP pitch correction code here.
+      showNotification("Autotune set to " + type);
+    }
+    
+    /***********************
+     * Custom Blob Editing and Draggable Visualizers
+     ***********************/
+    function makeDraggable(el) {
+      el.style.position = "absolute";
+      el.style.left = el.offsetLeft + "px";
+      el.style.top = el.offsetTop + "px";
+      el.addEventListener("mousedown", function(e) {
+        // If Shift is held and target is a custom blob, enable editing.
+        let customBlob = e.target.closest(".blob.custom");
+        if(e.shiftKey && customBlob) {
+          enableCustomBlobEditing(customBlob);
+          return;
+        }
+        e.preventDefault();
+        let startX = e.clientX, startY = e.clientY;
+        let origX = parseFloat(el.style.left), origY = parseFloat(el.style.top);
+        function mouseMoveHandler(e) {
+          let deltaX = e.clientX - startX, deltaY = e.clientY - startY;
+          el.style.left = (origX + deltaX) + "px";
+          el.style.top = (origY + deltaY) + "px";
+        }
+        function mouseUpHandler(e) {
+          document.removeEventListener("mousemove", mouseMoveHandler);
+          document.removeEventListener("mouseup", mouseUpHandler);
+          let trashRect = trashCan.getBoundingClientRect();
+          let elRect = el.getBoundingClientRect();
+          if (elRect.left < trashRect.right &&
+              elRect.right > trashRect.left &&
+              elRect.top < trashRect.bottom &&
+              elRect.bottom > trashRect.top) {
+            el.parentNode.removeChild(el);
+          }
+        }
+        document.addEventListener("mousemove", mouseMoveHandler);
+        document.addEventListener("mouseup", mouseUpHandler);
+      });
+    }
+    document.querySelectorAll(".visualizer").forEach(makeDraggable);
+    
+    // Custom Blob Editing: spawn six draggable handles (allowing movement outside original boundary)
+    function enableCustomBlobEditing(blob) {
+      if(blob.dataset.editing === "true") return;
+      blob.dataset.editing = "true";
+      let rect = blob.getBoundingClientRect();
+      // Create six handles around the blob (even if they go outside the original circle)
+      let handleCount = 6;
+      for(let i = 0; i < handleCount; i++){
+        let angle = (i * 360/handleCount) * Math.PI / 180;
+        let r = rect.width * 0.4; // base radius; handles can be moved beyond this later
+        let x = (rect.width/2) + r * Math.cos(angle);
+        let y = (rect.height/2) + r * Math.sin(angle);
+        let handle = document.createElement("div");
+        handle.classList.add("handle");
+        handle.style.left = (x - 6) + "px";
+        handle.style.top = (y - 6) + "px";
+        handle.addEventListener("mousedown", startHandleDrag);
+        handle.addEventListener("touchstart", startHandleDrag);
+        blob.appendChild(handle);
+      }
+      updateCustomBlobShape(blob);
+    }
+    
+    function startHandleDrag(e) {
+      e.stopPropagation();
+      let handle = e.target, blob = handle.parentNode;
+      let startX = e.clientX || e.touches[0].clientX;
+      let startY = e.clientY || e.touches[0].clientY;
+      let style = getComputedStyle(handle);
+      let initialLeft = parseFloat(style.left);
+      let initialTop = parseFloat(style.top);
+      
+      function moveHandler(e) {
+        e.preventDefault();
+        let clientX = e.clientX || e.touches[0].clientX;
+        let clientY = e.clientY || e.touches[0].clientY;
+        let deltaX = clientX - startX, deltaY = clientY - startY;
+        // Allow the handle to be moved freely without clamping.
+        let newLeft = initialLeft + deltaX;
+        let newTop = initialTop + deltaY;
+        handle.style.left = newLeft + "px";
+        handle.style.top = newTop + "px";
+        updateCustomBlobShape(blob);
+      }
+      
+      function upHandler(e) {
+        document.removeEventListener("mousemove", moveHandler);
+        document.removeEventListener("mouseup", upHandler);
+        document.removeEventListener("touchmove", moveHandler);
+        document.removeEventListener("touchend", upHandler);
+      }
+      
+      document.addEventListener("mousemove", moveHandler);
+      document.addEventListener("mouseup", upHandler);
+      document.addEventListener("touchmove", moveHandler);
+      document.addEventListener("touchend", upHandler);
+    }
+    
+    function updateCustomBlobShape(blob) {
+      let rect = blob.getBoundingClientRect();
+      let centerX = rect.width / 2, centerY = rect.height / 2;
+      let points = [];
+      blob.querySelectorAll('.handle').forEach(handle => {
+        // Get handle center relative to blob’s top-left.
+        let style = getComputedStyle(handle);
+        let left = parseFloat(style.left) + 6; // center adjustment for 12px handle
+        let top = parseFloat(style.top) + 6;
+        let percX = (left / rect.width) * 100;
+        let percY = (top / rect.height) * 100;
+        let angle = Math.atan2(top - centerY, left - centerX);
+        points.push({x: percX, y: percY, angle});
+      });
+      points.sort((a,b) => a.angle - b.angle);
+      let polygonStr = 'polygon(' + points.map(p => `${p.x.toFixed(1)}% ${p.y.toFixed(1)}%`).join(', ') + ')';
+      blob.style.clipPath = polygonStr;
+    }
+    
+    /***********************
+     * Visualizer Customization and Addition/Removal
+     ***********************/
+    addButton.addEventListener("click", () => {
+      const visualizers = document.querySelectorAll(".visualizer");
+      if(visualizers.length >= 20) return;
+      const newVis = document.createElement("div");
+      let shape = shapeSelector.value;
+      if(shape === "big-circle") {
+        newVis.classList.add("visualizer", "large");
+      } else if(shape === "small-circle") {
+        newVis.classList.add("visualizer", "small");
+      } else {
+        newVis.classList.add("visualizer", "small");
+      }
+      const newBlob = document.createElement("div");
+      if(shape === "big-circle" || shape === "small-circle") {
+        newBlob.classList.add("blob", "circle");
+      } else if(shape === "star") {
+        newBlob.classList.add("blob", "star");
+      } else if(shape === "custom") {
+        newBlob.classList.add("blob", "custom");
+      }
+      newBlob.setAttribute("data-scale", shape === "big-circle" ? "1" : "0.6");
+      newVis.appendChild(newBlob);
+      newVis.style.left = (visualizerContainer.clientWidth / 2 - 50) + "px";
+      newVis.style.top = (visualizerContainer.clientHeight / 2 - 50) + "px";
+      visualizerContainer.appendChild(newVis);
+      makeDraggable(newVis);
+    });
+    
+    removeButton.addEventListener("click", () => {
+      const visualizers = document.querySelectorAll(".visualizer");
+      if(visualizers.length <= 1) return;
+      visualizerContainer.removeChild(visualizers[visualizers.length - 1]);
+    });
+    
+    /***********************
+     * Lyrics Synchronization using LRC Timings
+     ***********************/
+    function updateLyrics() {
+      const time = audio.currentTime;
+      let newIndex = lyrics.findIndex((line, i) => {
+        const next = lyrics[i + 1];
+        return time >= line.time && (!next || time < next.time);
+      });
+      if(newIndex !== -1 && newIndex !== currentIndex) { currentIndex = newIndex; }
+      let start = Math.max(0, currentIndex - 5);
+      let end = Math.min(lyrics.length, currentIndex + 6);
+      let displayText = "";
+      for(let i = start; i < end; i++){
+        if(i === currentIndex) {
+          displayText += "<div style='font-weight:bold; color:yellow;'>" + lyrics[i].text + "</div>";
+        } else { displayText += "<div>" + lyrics[i].text + "</div>"; }
+      }
+      lyricsContainer.innerHTML = displayText;
+      requestAnimationFrame(updateLyrics);
+    }
+    
+    songSelector.addEventListener("change", (e) => {
+      loadSong(e.target.value);
+      audio.playbackRate = 1.0;
+      startRandomAnimations();
+    });
+    
+    playButton.addEventListener("click", () => {
+      if(audio.paused) { audio.play(); playButton.textContent = "Pause"; }
+      else { audio.pause(); playButton.textContent = "Play"; }
+    });
+    
+    loadSong("song1");
+    
+    /***********************
+     * Visualizer Animation and Clear Screen (Spacebar) Mode
+     ***********************/
+    function animateVisualizer() {
+      if(micActive && micAnalyzer) {
+        micAnalyzer.getByteFrequencyData(dataArray);
+      } else if(analyser) {
+        analyser.getByteFrequencyData(dataArray);
+      }
+      let sum = 0;
+      for(let i = 0; i < dataArray.length; i++){
+        sum += dataArray[i];
+      }
+      let avg = sum / dataArray.length;
+      
+      if(songSelector.value === "song6") {
+        smoothedHue += (0 - smoothedHue) * smoothingFactor;
+      } else {
+        const targetHue = (avg * 360 / 256) % 360;
+        smoothedHue += (targetHue - smoothedHue) * smoothingFactor;
+      }
+      
+      const oscillationFrequency = 2;
+      const targetOffsetX = Math.sin(audio.currentTime * oscillationFrequency) * (avg / 80);
+      const targetOffsetY = Math.cos(audio.currentTime * oscillationFrequency) * (avg / 80);
+      smoothedOffsetX += (targetOffsetX - smoothedOffsetX) * smoothingFactor;
+      smoothedOffsetY += (targetOffsetY - smoothedOffsetY) * smoothingFactor;
+      
+      const rotateY = audio.currentTime * 5;
+      const glowIntensity = avg / 80;
+      const shadowBlur = 20 + glowIntensity * 40;
+      const shadowSpread = 10 + glowIntensity * 20;
+      let dynamicBoxShadow = `0 0 ${shadowBlur}px ${shadowSpread}px `;
+      if(songSelector.value === "song6") { dynamicBoxShadow += `rgba(255,0,0,0.9)`; }
+      else { dynamicBoxShadow += `rgba(0,255,255,0.9)`; }
+      
+      const currentBlobs = document.querySelectorAll(".blob");
+      currentBlobs.forEach(blob => {
+        const scaleFactor = parseFloat(blob.getAttribute("data-scale"));
+        blob.style.transform = `translate(-50%, -50%) rotateY(${rotateY}deg) scale(${scaleFactor})`;
+        if(songSelector.value === "song6") { blob.style.backgroundColor = `hsl(0, 100%, 50%)`; }
+        else { blob.style.backgroundColor = `hsl(${smoothedHue}, 100%, 50%)`; }
+        blob.style.boxShadow = dynamicBoxShadow;
+        // Apply clear screen opacity if toggled.
+        if(clearScreenMode) { blob.style.opacity = "0.3"; }
+        else { blob.style.opacity = "1"; }
+      });
+      
+      if(Math.abs(avg - lastAvg) > 10) {
+        document.querySelectorAll(".visualizer").forEach(vis => {
+          const rect = vis.getBoundingClientRect();
+          const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+          spawnStrata(cx, cy, vis.clientWidth * 0.1, songSelector.value === "song6" ? "red" : `hsl(${smoothedHue}, 100%, 50%)`);
+        });
+      }
+      lastAvg = avg;
+      
+      if(songSelector.value === "song6") {
+        drawMurderSheWroteEffects();
+      }
+      
+      requestAnimationFrame(animateVisualizer);
+    }
+    
+    function spawnStrata(x, y, size, color) {
+      for(let i = 0; i < 10; i++){
+        particles.push(new Particle(x, y, "strata", size, color));
+      }
+    }
+    
+    /***********************
+     * Particle and Drawing Functions for Canvas Effects
+     ***********************/
+    class Particle {
+      constructor(x, y, type = "lily", customSize, customColor) {
+        this.x = x; this.y = y; this.type = type;
+        if(this.type === "lily") {
+          this.radius = Math.random()*3+3;
+          this.decay = Math.random()*0.01+0.005;
+          this.randomColors = [
+            `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`,
+            `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`,
+            `hsl(${Math.floor(Math.random()*360)}, 100%, 50%)`
+          ];
+        } else if(this.type === "blood") {
+          this.radius = Math.random()*5+5;
+          this.decay = Math.random()*0.02+0.005;
+        } else if(this.type === "strata") {
+          this.radius = customSize || (Math.random()*1+1);
+          this.decay = Math.random()*0.007+0.002;
+          this.velocityX = Math.random()*4-2;
+          this.velocityY = Math.random()*4-2;
+          this.customColor = customColor;
+        }
+        if(this.type !== "strata") {
+          const angle = Math.random()*2*Math.PI;
+          const speed = Math.random()*5+3;
+          this.velocityX = Math.cos(angle)*speed;
+          this.velocityY = Math.sin(angle)*speed;
+        }
+        this.alpha = 1;
+      }
+      update() {
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        this.alpha -= this.decay;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        if(this.type === "lily") { drawLily(ctx, this.x, this.y, this.radius*8, this.randomColors); }
+        else if(this.type === "blood") { drawBloodDrip(ctx, this.x, this.y, this.radius*2); }
+        else if(this.type === "strata") { drawStrata(ctx, this.x, this.y, this.radius*2, this.customColor); }
+        ctx.restore();
+      }
+    }
+    
+    function drawLily(ctx, x, y, size, colors) {
+      ctx.save();
+      ctx.translate(x, y);
+      let grad = ctx.createRadialGradient(0, 0, size*0.1, 0, 0, size);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(0.5, colors[1]);
+      grad.addColorStop(1, colors[2]);
+      ctx.fillStyle = grad;
+      ctx.shadowColor = "rgba(255,255,255,0.8)";
+      ctx.shadowBlur = 20;
+      for(let i = 0; i < 4; i++){
+        ctx.rotate((Math.PI*2)/4);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.quadraticCurveTo(size*0.3, size*0.5, 0, size);
+        ctx.quadraticCurveTo(-size*0.3, size*0.5, 0, 0);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    
+    function drawBloodDrip(ctx, x, y, size) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.bezierCurveTo(-size, size*1.2, -size*0.5, size*2.5, 0, size*3);
+      ctx.bezierCurveTo(size*0.5, size*2.5, size, size*1.2, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    function drawStrata(ctx, x, y, size, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      let grad;
+      if(songSelector.value === "song6") {
+        grad = ctx.createRadialGradient(0,0,size*0.1,0,0,size);
+        grad.addColorStop(0, "#ff0000");
+        grad.addColorStop(0.5, "#cc0000");
+        grad.addColorStop(1, "#990000");
+      } else {
+        const brightColors = ["#ff69b4", "#00bfff", "#ffff00", "#ff4500", "#00ff7f"];
+        const c1 = brightColors[Math.floor(Math.random()*brightColors.length)];
+        const c2 = brightColors[Math.floor(Math.random()*brightColors.length)];
+        const c3 = brightColors[Math.floor(Math.random()*brightColors.length)];
+        grad = ctx.createRadialGradient(0,0,size*0.1,0,0,size);
+        grad.addColorStop(0, c1);
+        grad.addColorStop(0.5, c2);
+        grad.addColorStop(1, c3);
+      }
+      ctx.fillStyle = grad;
+      ctx.shadowColor = "rgba(255,255,255,0.8)";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(0, 0, size, 0, 2*Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    let particles = [];
+    function triggerLilyExplosion() {
+      const x = Math.random()*fireworksCanvas.width;
+      const y = Math.random()*fireworksCanvas.height*0.5;
+      const numParticles = 40;
+      for(let i = 0; i < numParticles; i++){
+        particles.push(new Particle(x,y,"lily"));
+      }
+    }
+    
+    function triggerBloodSplatter() {
+      const x = Math.random()*fireworksCanvas.width;
+      const y = Math.random()*fireworksCanvas.height*0.5;
+      const numParticles = 50;
+      for(let i = 0; i < numParticles; i++){
+        particles.push(new Particle(x,y,"blood"));
+      }
+    }
+    
+    function animateFireworks() {
+      fwCtx.fillStyle = "rgba(0, 0, 0, 0.07)";
+      fwCtx.fillRect(0,0,fireworksCanvas.width,fireworksCanvas.height);
+      for(let i = particles.length - 1; i >= 0; i--){
+        const p = particles[i];
+        p.update();
+        p.draw(fwCtx);
+        if(p.alpha <= 0){ particles.splice(i,1); }
+      }
+      requestAnimationFrame(animateFireworks);
+    }
+    animateFireworks();
+    
+    /***********************
+     * 3D/4D Effects for "Murder She Wrote"
+     ***********************/
+    function drawMurderSheWroteEffects() {
+      fwCtx.save();
+      fwCtx.globalAlpha = 0.1;
+      let gradient = fwCtx.createRadialGradient(fireworksCanvas.width/2, fireworksCanvas.height/2, 50, fireworksCanvas.width/2, fireworksCanvas.height/2, 300);
+      gradient.addColorStop(0, "rgba(255,0,0,0.5)");
+      gradient.addColorStop(1, "rgba(0,0,0,0)");
+      fwCtx.fillStyle = gradient;
+      fwCtx.beginPath();
+      fwCtx.arc(fireworksCanvas.width/2, fireworksCanvas.height/2, 300, 0, 2*Math.PI);
+      fwCtx.fill();
+      fwCtx.restore();
+    }
+    
+    /***********************
+     * Resize Canvas for Responsive Layout
+     ***********************/
+    function resizeCanvas() {
+      fireworksCanvas.width = window.innerWidth;
+      fireworksCanvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    
+    let randomAnimationInterval = null;
+    function startRandomAnimations() {
+      if(randomAnimationInterval) clearInterval(randomAnimationInterval);
+      if(songSelector.value === "song6") {
+        randomAnimationInterval = setInterval(triggerBloodSplatter, 3000);
+      } else {
+        randomAnimationInterval = setInterval(() => {
+          triggerLilyExplosion();
+          triggerLilyExplosion();
+        }, 5000);
+      }
+    }
+    
+    /***********************
+     * New: Spacebar Clear Screen Mode & Lyrics Controls
+     ***********************/
+    document.addEventListener("keydown", (e) => {
+      if(e.code === "Space") {
+        // Toggle clear screen mode: lower opacity of visualizers and animations.
+        clearScreenMode = !clearScreenMode;
+        if(clearScreenMode) { showNotification("Clear Screen Mode Activated"); }
+        else { showNotification("Clear Screen Mode Deactivated"); }
+      }
+    });
+    
+    // Lyrics Opacity Control
+    lyricsOpacitySlider.addEventListener("input", () => {
+      lyricsContainer.style.opacity = lyricsOpacitySlider.value;
+    });
+    // Lyrics Size Control
+    lyricsSizeSlider.addEventListener("input", () => {
+      lyricsContainer.style.fontSize = lyricsSizeSlider.value + "px";
+    });
+    
+  </script>
+</body>
+</html>
